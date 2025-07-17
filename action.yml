@@ -93,9 +93,34 @@ runs:
       id:    auth
       shell: bash
       run: |
-        curl -s https://yasslab.jp/members.json | \
-        jq -e ".[] | select(.username_github == \"${{ github.event.comment.user.login }}\")" > /dev/null || exit 0
-        echo "authorized=true" >> $GITHUB_OUTPUT
+        # APIタイムアウトとリトライ設定
+        USERNAME="${{ github.event.comment.user.login }}"
+        echo "::debug::Checking authorization for user: $USERNAME"
+        
+        # members.jsonを取得（タイムアウト10秒、リトライ2回）
+        for i in {1..2}; do
+          if curl -sSf --max-time 10 https://yasslab.jp/members.json -o members.json; then
+            break
+          fi
+          echo "::warning::Failed to fetch members.json (attempt $i/2)"
+          [ $i -eq 2 ] && exit 0
+          sleep 2
+        done
+        
+        # JSON妥当性チェック
+        if ! jq empty members.json 2>/dev/null; then
+          echo "::error::Invalid JSON in members.json"
+          exit 0
+        fi
+        
+        # メンバー認証
+        if jq -e ".[] | select(.username_github == \"$USERNAME\")" members.json > /dev/null; then
+          echo "::notice::✅ Authorized YassLab member: $USERNAME"
+          echo "authorized=true" >> $GITHUB_OUTPUT
+        else
+          echo "::warning::❌ Not authorized: $USERNAME is not a YassLab member"
+          exit 0
+        fi
 
     - name: Claude Code Actions
       if: steps.auth.outputs.authorized == 'true'
