@@ -17,6 +17,15 @@ on:
 
 jobs:
   claude-review:
+    # ✅ 実行される場合:
+    # - PR 作成時（自動レビュー）
+    # - PR 更新時（自動レビュー）
+    # - Issueコメントで「@claude これを見て」
+    # - PR のコメントで「@claude レビューして」
+    # 
+    # ❌ 実行されない場合:
+    # - Issueコメントでも @claude がない場合
+    # - PR のコメントでも @claude がない場合
     if: |
       (github.event_name == 'pull_request') ||
       (github.event_name == 'issue_comment' && 
