@@ -1,0 +1,94 @@
+name: 'Claude Claude Actions for YassLab team'
+description: 'YassLab用にカスタマイズされた Claude AI コードレビュー'
+author: 'YassLab Inc.'
+
+branding:
+  icon:  'message-circle'
+  color: 'blue'
+
+inputs:
+  claude-oauth-token:
+    description: 'Claude Code API Token'
+    required: true
+  model:
+    description: 'Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4)'
+    required: false
+    default: 'claude-opus-4-20250514'
+  direct-prompt:
+    description: 'Direct prompt for automated review (no @claude mention needed)'
+    required: false
+    default: ''
+  trigger-phrase:
+    description: 'トリガーフレーズ'
+    required: false
+    default: '@claude'
+  base-branch:
+    description: 'ベースブランチ'
+    required: false
+    default: ''
+  max-turns:
+    description: '最大会話ターン数'
+    required: false
+    default: ''
+  timeout-minutes:
+    description: 'タイムアウト（分）'
+    required: false
+    default: ''
+  allowed-tools:
+    description: 'Add specific tools for running tests or linting'
+    required: false
+    default: ''
+    # allowed-tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
+  custom-instructions:
+    description: 'カスタム指示'
+    required: false
+    default: ''
+  # Optional: Use sticky comments to make Claude reuse the same comment on subsequent pushes to the same PR
+  # use_sticky_comment: true
+  #
+  # Optional: Customize review based on file types
+  # direct_prompt: |
+  #   Review this PR focusing on:
+  #   - For TypeScript files: Type safety and proper interface usage
+  #   - For API endpoints: Security, input validation, and error handling
+  #   - For React components: Performance, accessibility, and best practices
+  #   - For tests: Coverage, edge cases, and test quality
+  #        
+  # Optional: Different prompts for different authors
+  # direct_prompt: |
+  #   ${{ github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' && 
+  #   'Welcome! Please review this PR from a first-time contributor. Be encouraging and provide detailed explanations for any suggestions.' ||
+  #   'Please provide a thorough code review focusing on our coding standards and best practices.' }}
+  #        
+  # Optional: Add specific tools for running tests or linting
+  # allowed_tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
+  #        
+  # Optional: Skip review for certain conditions
+  # if: |
+  #   !contains(github.event.pull_request.title, '[skip-review]') &&
+  #   !contains(github.event.pull_request.title, '[WIP]')
+
+runs:
+  using: 'composite'
+  steps:
+    - name:  Check if available members
+      id:    auth
+      shell: bash
+      run: |
+        curl -s https://yasslab.jp/members.json | \
+        jq -e ".[] | select(.username_github == \"${{ github.event.comment.user.login }}\")" > /dev/null || exit 0
+        echo "authorized=true" >> $GITHUB_OUTPUT
+
+    - name: Claude Code Actions
+      if: steps.auth.outputs.authorized == 'true'
+      uses: anthropics/claude-code-action@beta
+      with:
+        claude_code_oauth_token: ${{ inputs.claude-oauth-token }}
+        model:                   ${{ inputs.model }}
+        direct_prompt:           ${{ inputs.direct-prompt }}
+        trigger_phrase:          ${{ inputs.trigger-phrase }}
+        base_branch:             ${{ inputs.base-branch }}
+        max_turns:               ${{ inputs.max-turns }}
+        timeout_minutes:         ${{ inputs.timeout-minutes }}
+        allowed_tools:           ${{ inputs.allowed-tools }}
+        custom_instructions:     ${{ inputs.custom-instructions }}
