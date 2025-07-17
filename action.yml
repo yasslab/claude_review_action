@@ -17,28 +17,46 @@ inputs:
   direct-prompt:
     description: 'Direct prompt for automated review (no @claude mention needed)'
     required: false
-    default: ''
+    default: |
+      Always respond in Japanese, even if given instructions are in English.
+      Use Japanese for all outputs, explanations, and comments in code.
+
+      Review this pull request and provide constructive feedback on:
+      - Code quality and best practices
+      - Potential bugs or issues
+      - Performance considerations
+      - Security concerns
+      - Test coverage
+      
+      All your outputs have to be organized with collapsed sections by using the <details> tag.
+      https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/organizing-information-with-collapsed-sections
+
   trigger-phrase:
     description: 'トリガーフレーズ'
     required: false
     default: '@claude'
+
   base-branch:
     description: 'ベースブランチ'
     required: false
     default: ''
+
   max-turns:
     description: '最大会話ターン数'
     required: false
     default: ''
+
   timeout-minutes:
     description: 'タイムアウト（分）'
     required: false
     default: ''
+
   allowed-tools:
     description: 'Add specific tools for running tests or linting'
     required: false
     default: ''
     # allowed-tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
+
   custom-instructions:
     description: 'カスタム指示'
     required: false
