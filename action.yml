@@ -8,14 +8,14 @@ branding:
 
 # Docs: https://github.com/anthropics/claude-code-action#readme
 inputs:
-  claude-oauth-token:
+  claude_code_oauth_token:
     description: 'Claude Code API Token'
     required: true
   model:
     description: 'Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4)'
     required: false
     default: 'claude-opus-4-20250514'
-  direct-prompt:
+  direct_prompt:
     description: 'Direct prompt for automated review (no @claude mention needed)'
     required: false
     default: |
@@ -32,33 +32,33 @@ inputs:
       All your outputs have to be organized with collapsed sections by using the <details> tag.
       https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/organizing-information-with-collapsed-sections
 
-  trigger-phrase:
+  trigger_phrase:
     description: 'トリガーフレーズ'
     required: false
     default: '@claude'
 
-  base-branch:
+  base_branch:
     description: 'ベースブランチ'
     required: false
     default: ''
 
-  max-turns:
+  max_turns:
     description: '最大会話ターン数'
     required: false
     default: ''
 
-  timeout-minutes:
+  timeout_minutes:
     description: 'タイムアウト（分）'
     required: false
     default: ''
 
-  allowed-tools:
+  allowed_tools:
     description: 'Add specific tools for running tests or linting'
     required: false
     default: ''
-    # allowed-tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
+    # allowed_tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
 
-  custom-instructions:
+  custom_instructions:
     description: 'カスタム指示'
     required: false
     default: ''
@@ -133,12 +133,12 @@ runs:
       if: steps.auth.outputs.authorized == 'true'
       uses: anthropics/claude-code-action@beta
       with:
-        claude_code_oauth_token: ${{ inputs.claude-oauth-token }}
+        claude_code_oauth_token: ${{ inputs.claude_code_oauth_token }}
         model:                   ${{ inputs.model }}
-        direct_prompt:           ${{ inputs.direct-prompt }}
-        trigger_phrase:          ${{ inputs.trigger-phrase }}
-        base_branch:             ${{ inputs.base-branch }}
-        max_turns:               ${{ inputs.max-turns }}
-        timeout_minutes:         ${{ inputs.timeout-minutes }}
-        allowed_tools:           ${{ inputs.allowed-tools }}
-        custom_instructions:     ${{ inputs.custom-instructions }}
+        direct_prompt:           ${{ inputs.direct_prompt }}
+        trigger_phrase:          ${{ inputs.trigger_phrase }}
+        base_branch:             ${{ inputs.base_branch }}
+        max_turns:               ${{ inputs.max_turns }}
+        timeout_minutes:         ${{ inputs.timeout_minutes }}
+        allowed_tools:           ${{ inputs.allowed_tools }}
+        custom_instructions:     ${{ inputs.custom_instructions }}
