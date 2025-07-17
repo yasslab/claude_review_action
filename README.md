@@ -22,7 +22,7 @@ jobs:
     # - PR 更新時（自動レビュー）
     # - Issueコメントで「@claude これを見て」
     # - PR のコメントで「@claude レビューして」
-    # 
+    #
     # ❌ 実行されない場合:
     # - Issueコメントでも @claude がない場合
     # - PR のコメントでも @claude がない場合
@@ -33,7 +33,7 @@ jobs:
     
     runs-on: ubuntu-latest
     
-    # 最小限の権限のみ付与
+    # 推奨: 最小限の権限のみ付与
     permissions:
       contents:      read  # Repository 内の権限
       pull-requests: read  # PR 内コメントの権限
