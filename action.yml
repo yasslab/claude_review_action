@@ -6,6 +6,7 @@ branding:
   icon:  'message-circle'
   color: 'blue'
 
+# Docs: https://github.com/anthropics/claude-code-action#readme
 inputs:
   claude-oauth-token:
     description: 'Claude Code API Token'
@@ -93,10 +94,41 @@ runs:
       id:    auth
       shell: bash
       run: |
-        curl -s https://yasslab.jp/members.json | \
-        jq -e ".[] | select(.username_github == \"${{ github.event.comment.user.login }}\")" > /dev/null || exit 0
-        echo "authorized=true" >> $GITHUB_OUTPUT
+        # APIタイムアウトとリトライ設定
+        USERNAME="${{ github.event.comment.user.login }}"
+        echo "::debug::Checking authorization for user: $USERNAME"
+        
+        # members.jsonを取得（タイムアウト10秒、リトライ2回）
+        for i in {1..2}; do
+          if curl -sSf --max-time 10 https://yasslab.jp/members.json -o members.json; then
+            break
+          fi
+          echo "::warning::Failed to fetch members.json (attempt $i/2)"
+          if [ $i -eq 2 ]; then
+            echo "authorized=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          sleep 2
+        done
+        
+        # JSON妥当性チェック
+        if ! jq empty members.json 2>/dev/null; then
+          echo "::error::Invalid JSON in members.json"
+          echo "authorized=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        # メンバー認証
+        if jq -e ".[] | select(.username_github == \"$USERNAME\")" members.json > /dev/null; then
+          echo "::notice::✅ Authorized YassLab member: $USERNAME"
+          echo "authorized=true" >> $GITHUB_OUTPUT
+        else
+          echo "::warning::❌ Not authorized: $USERNAME is not a YassLab member"
+          echo "authorized=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
 
+    # Docs: https://github.com/anthropics/claude-code-action#readme
     - name: Claude Code Actions
       if: steps.auth.outputs.authorized == 'true'
       uses: anthropics/claude-code-action@beta
