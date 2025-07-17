@@ -31,10 +31,3 @@ jobs:
         uses: ./
         with:
           claude-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # PR自動レビュー用のプロンプト（PR作成時）
-          direct-prompt: |
-            このPRを日本語でレビューしてください。
-            特に以下の点に注目してください：
-            - アクションの設定が正しいか
-            - セキュリティ面での問題がないか
-            - YassLabメンバー認証が適切に動作するか
