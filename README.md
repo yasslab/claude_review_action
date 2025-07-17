@@ -55,4 +55,4 @@ jobs:
 
 -----
 
-Copyright &copy; [@YassLab](http://github.com/yasslab).
+Copyright &copy; [YassLab](http://github.com/yasslab).
