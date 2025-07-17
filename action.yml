@@ -94,32 +94,13 @@ runs:
       id:    auth
       shell: bash
       run: |
-        # APIタイムアウトとリトライ設定
+        # 認証チェック
         USERNAME="${{ github.event.comment.user.login }}"
         echo "::debug::Checking authorization for user: $USERNAME"
         
-        # members.jsonを取得（タイムアウト10秒、リトライ2回）
-        for i in {1..2}; do
-          if curl -sSf --max-time 10 https://yasslab.jp/members.json -o tmp/members.json; then
-            break
-          fi
-          echo "::warning::Failed to fetch members.json (attempt $i/2)"
-          if [ $i -eq 2 ]; then
-            echo "authorized=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          sleep 2
-        done
-        
-        # JSON妥当性チェック
-        if ! jq empty tmp/members.json 2>/dev/null; then
-          echo "::error::Invalid JSON in members.json"
-          echo "authorized=false" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-        
-        # メンバー認証
-        if jq -e ".[] | select(.username_github == \"$USERNAME\")" tmp/members.json > /dev/null; then
+        # members.jsonを取得してメモリ内で処理
+        if curl -s https://yasslab.jp/members.json | \
+           jq -e ".[] | select(.username_github == \"$USERNAME\")" > /dev/null 2>&1; then
           echo "::notice::✅ Authorized YassLab member: $USERNAME"
           echo "authorized=true" >> $GITHUB_OUTPUT
         else
