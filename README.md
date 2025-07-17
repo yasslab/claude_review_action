@@ -3,3 +3,45 @@
 YassLab チーム用の Claude Code カスタムアクションです。
 
 :octocat: https://github.com/yasslab
+
+## Example Usage
+
+```yaml
+name: Claude Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
+
+jobs:
+  claude-review:
+    if: |
+      (github.event_name == 'pull_request') ||
+      (github.event_name == 'issue_comment' && 
+       contains(github.event.comment.body, '@claude'))
+    
+    runs-on: ubuntu-latest
+    
+    # 最小限の権限のみ付与
+    permissions:
+      contents:      read  # Repository 内の権限
+      pull-requests: read  # PR 内コメントの権限
+      issues:        read  # Issueコメントの権限
+      actions:       read  # Required for CI access
+      id-token:      write # 実行時に適切な権限を取得
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Claude Review
+        uses: yasslab/claude_review_action@main
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+```
+
+-----
+
+Copyright &copy; [@YassLab](http://github.com/yasslab).
