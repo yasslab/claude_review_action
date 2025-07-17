@@ -1,0 +1,40 @@
+name: Claude Review Test
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
+
+jobs:
+  claude-review:
+    if: |
+      (github.event_name == 'pull_request') ||
+      (github.event_name == 'issue_comment' && 
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '@claude'))
+    
+    runs-on: ubuntu-latest
+    
+    # 最小限の権限のみ付与
+    permissions:
+      contents:      read  # リポジトリ内容の読込
+      pull-requests: read  # PRのコメントの読込
+      issues:        read  # Issueのコメントの読込
+      id-token:      write # 実行時に適切な権限を取得
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Claude Review
+        uses: ./
+        with:
+          claude-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # PR自動レビュー用のプロンプト（PR作成時）
+          direct-prompt: |
+            このPRを日本語でレビューしてください。
+            特に以下の点に注目してください：
+            - アクションの設定が正しいか
+            - セキュリティ面での問題がないか
+            - YassLabメンバー認証が適切に動作するか
