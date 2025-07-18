@@ -6,6 +6,10 @@ YassLab チーム用の Claude Code カスタムアクションです。
 
 ## Example Usage
 
+```bash
+.github/workflows/claude-review.yml
+```
+
 ```yaml
 name: Claude Review
 
