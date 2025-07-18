@@ -2,7 +2,7 @@
 
 YassLab チーム用の Claude Code カスタムアクションです。
 
-[&raquo; デフォルト設定を見る](https://github.com/yasslab/claude_review_action/blob/main/.github/workflows/claude-review.yml)
+[&raquo; デフォルト設定を見る](https://github.com/yasslab/claude_review_action/blob/main/action.yml)
 
 ## Example Usage
 
