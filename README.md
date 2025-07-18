@@ -2,7 +2,7 @@
 
 YassLab チーム用の Claude Code カスタムアクションです。
 
-:octocat: https://github.com/yasslab
+[&raquo; デフォルト設定を見る](https://github.com/yasslab/claude_review_action/blob/main/.github/workflows/claude-review.yml)
 
 ## Example Usage
 
