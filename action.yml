@@ -8,13 +8,16 @@ branding:
 
 # Docs: https://github.com/anthropics/claude-code-action#readme
 inputs:
+  additional_permissions:
+    description: 'Tell Claude that you are allowed to do given permissions (e.g. Can read CI results)'
+    required: false
+    default: |
+      actions: read
+
   claude_code_oauth_token:
     description: 'Claude Code API Token'
     required: true
-  model:
-    description: 'Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4)'
-    required: false
-    default: 'claude-opus-4-20250514'
+
   direct_prompt:
     description: 'Direct prompt for automated review (no @claude mention needed)'
     required: false
@@ -32,39 +35,65 @@ inputs:
       All your outputs have to be organized with collapsed sections by using the <details> tag.
       https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/organizing-information-with-collapsed-sections
 
-  trigger_phrase:
-    description: 'トリガーフレーズ'
+  model:
+    description: 'Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4)'
     required: false
-    default: '@claude'
+    default: 'claude-opus-4-20250514'
 
-  base_branch:
-    description: 'ベースブランチ'
-    required: false
-    default: ''
+  #trigger_phrase:
+  #  description: 'Customize the trigger phrase (default: @claude)'
+  #  required: false
+  #  default: '@claude'
 
-  max_turns:
-    description: '最大会話ターン数'
-    required: false
-    default: ''
+  #base_branch:
+  #  description: 'ベースブランチ'
+  #  required: false
+  #  default: ''
 
-  timeout_minutes:
-    description: 'タイムアウト（分）'
-    required: false
-    default: ''
+  #max_turns:
+  #  description: '最大会話ターン数'
+  #  required: false
+  #  default: ''
 
-  allowed_tools:
-    description: 'Add specific tools for running tests or linting'
-    required: false
-    default: ''
-    # allowed_tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
+  #timeout_minutes:
+  #  description: 'タイムアウト（分）'
+  #  required: false
+  #  default: ''
 
-  custom_instructions:
-    description: 'カスタム指示'
-    required: false
-    default: ''
+  #allowed_tools:
+  #  description: 'Add specific tools for running tests or linting'
+  #  required: false
+  #  default: ''
+  # # e.g.
+  # allowed_tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
+
+  #custom_instructions:
+  #  description: 'カスタム指示'
+  #  required: false
+  #  default: ''          
+          
+  # Optional: Customize the trigger phrase (default: @claude)
+  # trigger_phrase: "/claude"
+          
+  # Optional: Trigger when specific user is assigned to an issue
+  # assignee_trigger: "claude-bot"
+          
+  # Optional: Allow Claude to run specific commands
+  # allowed_tools: "Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*)"
+          
+  # Optional: Add custom instructions for Claude to customize its behavior for your project
+  # custom_instructions: |
+  #   Follow our coding standards
+  #   Ensure all new code has tests
+  #   Use TypeScript for new files
+          
+  # Optional: Custom environment variables for Claude
+  # claude_env: |
+  #   NODE_ENV: test
+
   # Optional: Use sticky comments to make Claude reuse the same comment on subsequent pushes to the same PR
   # use_sticky_comment: true
-  #
+
   # Optional: Customize review based on file types
   # direct_prompt: |
   #   Review this PR focusing on:
@@ -72,13 +101,13 @@ inputs:
   #   - For API endpoints: Security, input validation, and error handling
   #   - For React components: Performance, accessibility, and best practices
   #   - For tests: Coverage, edge cases, and test quality
-  #        
+
   # Optional: Different prompts for different authors
   # direct_prompt: |
   #   ${{ github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' && 
   #   'Welcome! Please review this PR from a first-time contributor. Be encouraging and provide detailed explanations for any suggestions.' ||
   #   'Please provide a thorough code review focusing on our coding standards and best practices.' }}
-  #        
+
   # Optional: Add specific tools for running tests or linting
   # allowed_tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
   #        
@@ -114,12 +143,13 @@ runs:
       if: steps.auth.outputs.authorized == 'true'
       uses: anthropics/claude-code-action@beta
       with:
+        additional_permissions:  ${{ inputs.additional_permissions }}
         claude_code_oauth_token: ${{ inputs.claude_code_oauth_token }}
-        model:                   ${{ inputs.model }}
         direct_prompt:           ${{ inputs.direct_prompt }}
-        trigger_phrase:          ${{ inputs.trigger_phrase }}
-        base_branch:             ${{ inputs.base_branch }}
-        max_turns:               ${{ inputs.max_turns }}
-        timeout_minutes:         ${{ inputs.timeout_minutes }}
-        allowed_tools:           ${{ inputs.allowed_tools }}
-        custom_instructions:     ${{ inputs.custom_instructions }}
+        model:                   ${{ inputs.model }}
+        #trigger_phrase:          ${{ inputs.trigger_phrase }}
+        #base_branch:             ${{ inputs.base_branch }}
+        #max_turns:               ${{ inputs.max_turns }}
+        #timeout_minutes:         ${{ inputs.timeout_minutes }}
+        #allowed_tools:           ${{ inputs.allowed_tools }}
+        #custom_instructions:     ${{ inputs.custom_instructions }}
