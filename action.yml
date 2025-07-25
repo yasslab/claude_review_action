@@ -63,25 +63,12 @@ inputs:
   allowed_tools:
     description: 'Allow specific tools to exec'
     required: false
-  # default: 'Bash(bundle install),Bash(bundle update),Bash(bundle exec rubocopy)'
-    default: |
-      Agent,
-      Bash(bundle install:*),
-      Bash(bundle update:*),
-      Bash(bundle exec rake:*),
-      Bash(bundle exec rspec:*),
-      Bash(bundle exec rubocop:*),
-      Edit,MultiEdit,
-      WebFetch,WebSearch,
-      Write
+    default: 'Agent,Bash(bundle install:*),Bash(bundle update:*),Bash(bundle exec rake:*),Bash(bundle exec rspec:*),Bash(bundle exec rubocop:*),Edit,MultiEdit,WebFetch,WebSearch,Write'
 
   disallowed_tools:
     description: 'Disallow specific tools to exec'
     required: false
-  # default: 'Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)'
-    default: |
-      Bash(git commit:*)
-      Bash(git push:*)
+    default: 'Bash(git commit:*),Bash(git push:*)'
 
   #custom_instructions:
   #  description: 'カスタム指示'
