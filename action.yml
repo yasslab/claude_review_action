@@ -63,12 +63,14 @@ inputs:
   allowed_tools:
     description: 'Allow specific tools to exec'
     required: false
+    # Ruby開発に必要なツールセット (bundle, test, linter など) と、基本的な編集・検索を許可
     default: 'Agent,Bash(bundle install:*),Bash(bundle update:*),Bash(bundle exec rake:*),Bash(bundle exec rspec:*),Bash(bundle exec rubocop:*),Edit,MultiEdit,WebFetch,WebSearch,Write'
 
   disallowed_tools:
     description: 'Disallow specific tools to exec'
     required: false
-    default: 'Bash(git commit:*),Bash(git push:*)'
+    # PR 内での自動コミットおよび権限取得コマンドなどを明示的に禁止
+    default: 'Bash(git commit:*),Bash(git push:*),Bash(rm -rf:*),Bash(sudo:*)'
 
   #custom_instructions:
   #  description: 'カスタム指示'
