@@ -60,12 +60,28 @@ inputs:
   #  required: false
   #  default: ''
 
-  #allowed_tools:
-  #  description: 'Add specific tools for running tests or linting'
-  #  required: false
-  #  default: ''
-  # # e.g.
-  # allowed_tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
+  allowed_tools:
+    description: 'Allow specific tools to exec'
+    required: false
+  # default: 'Bash(bundle install),Bash(bundle update),Bash(bundle exec rubocopy)'
+    default: |
+      Agent,
+      Bash(bundle install:*),
+      Bash(bundle update:*),
+      Bash(bundle exec rake:*),
+      Bash(bundle exec rspec:*),
+      Bash(bundle exec rubocop:*),
+      Edit,MultiEdit,
+      WebFetch,WebSearch,
+      Write
+
+  disallowed_tools:
+    description: 'Disallow specific tools to exec'
+    required: false
+  # default: 'Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)'
+    default: |
+      Bash(git commit:*)
+      Bash(git push:*)
 
   #custom_instructions:
   #  description: 'カスタム指示'
@@ -143,6 +159,8 @@ runs:
       if: steps.auth.outputs.authorized == 'true'
       uses: anthropics/claude-code-action@beta
       with:
+        allowed_tools:           ${{ inputs.allowed_tools }}
+        disallowed_tools:        ${{ inputs.disallowed_tools }}
         additional_permissions:  ${{ inputs.additional_permissions }}
         claude_code_oauth_token: ${{ inputs.claude_code_oauth_token }}
         direct_prompt:           ${{ inputs.direct_prompt }}
@@ -151,5 +169,4 @@ runs:
         #base_branch:             ${{ inputs.base_branch }}
         #max_turns:               ${{ inputs.max_turns }}
         #timeout_minutes:         ${{ inputs.timeout_minutes }}
-        #allowed_tools:           ${{ inputs.allowed_tools }}
         #custom_instructions:     ${{ inputs.custom_instructions }}
