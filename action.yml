@@ -27,7 +27,7 @@ inputs:
 
       Review this pull request and provide constructive feedback on:
       - Best practices on Ruby, Jekyll, or Ruby on Rails.
-      - Potential bugs, security concerns, and performance considerations.
+      - Critical bugs, security concerns, and performance considerations.
       - General principles on YAGNI, UNIX Philosophy, and Premature Optimization.
 
       Consider the project's context and existing patterns when suggesting changes.
