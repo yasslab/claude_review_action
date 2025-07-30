@@ -27,13 +27,19 @@ inputs:
 
       Review this pull request and provide constructive feedback on:
       - Best practices on Ruby, Jekyll, or Ruby on Rails.
-      - Potential bugs, security concerns, or performance considerations.
-      - Design principles on YAGNI, UNIX Philosophy, or Premature Optimization.
+      - Potential bugs, security concerns, and performance considerations.
+      - General principles on YAGNI, UNIX Philosophy, and Premature Optimization.
 
       Consider the project's context and existing patterns when suggesting changes.
       
-      All your outputs have to be organized with collapsed sections by using the <details> tag.
-      https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/organizing-information-with-collapsed-sections
+      All your outputs have to be organized with collapsed sections by using the <details> tags:
+      - 🚨 重大な問題 (セキュリティ、破壊的変更)
+      - ⚠️ 改善推奨 (ベストプラクティス違反)
+      - 💡 提案  (より良い実装方法)
+      - ✅ 良い実装 (参考になる箇所)
+
+      Note: Include only relevant sections. Skip if no items in a category.
+      Reference: https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/organizing-information-with-collapsed-sections
 
   model:
     description: 'Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4)'
