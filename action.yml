@@ -26,11 +26,11 @@ inputs:
       Use Japanese for all outputs, explanations, and comments in code.
 
       Review this pull request and provide constructive feedback on:
-      - Code quality and best practices
-      - Potential bugs or issues
-      - Performance considerations
-      - Security concerns
-      - Test coverage
+      - Best practices on Ruby, Jekyll, or Ruby on Rails.
+      - Potential bugs, security concerns, or performance considerations.
+      - Design principles on YAGNI, UNIX Philosophy, or Premature Optimization.
+
+      Consider the project's context and existing patterns when suggesting changes.
       
       All your outputs have to be organized with collapsed sections by using the <details> tag.
       https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/organizing-information-with-collapsed-sections
