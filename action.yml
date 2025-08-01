@@ -42,7 +42,7 @@ inputs:
       Reference: https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/organizing-information-with-collapsed-sections
 
   model:
-    description: 'Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4)'
+    description: 'Specify model (default: Claude Sonnet 4)'
     required: false
     default: 'claude-opus-4-20250514'
 
