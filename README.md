@@ -3,8 +3,9 @@
 YassLab チーム用の Claude Code カスタムアクションです。
 
 [&raquo; デフォルト設定を見る](https://github.com/yasslab/claude_review_action/blob/main/action.yml)
+[&raquo; レビュー利用例を見る](https://github.com/coderdojo-japan/coderdojo.jp/pull/1719)
 
-## Example Usage
+## カスタムアクションの設定例
 
 ```bash
 .github/workflows/claude-review.yml
