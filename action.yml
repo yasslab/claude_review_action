@@ -44,7 +44,8 @@ inputs:
   model:
     description: 'Specify model (default: Claude Sonnet 4)'
     required: false
-    default: 'claude-opus-4-20250514'
+    default: 'claude-opus-4-1-20250805'
+    #default: 'claude-opus-4-20250514'
 
   #trigger_phrase:
   #  description: 'Customize the trigger phrase (default: @claude)'
