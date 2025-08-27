@@ -41,6 +41,8 @@ inputs:
       Note: Include only relevant sections. Skip if no items in a category.
       Reference: https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/organizing-information-with-collapsed-sections
 
+      Also note that, for now, you can suggest changes by comments but cannot commit/push to GitHub.
+
   model:
     description: 'Specify model (default: Claude Sonnet 4)'
     required: false
@@ -70,8 +72,10 @@ inputs:
   allowed_tools:
     description: 'Allow specific tools to exec'
     required: false
-    # Ruby開発に必要なツールセット (bundle, test, linter など) と、基本的な編集・検索を許可
-    default: 'Agent,Bash(bundle install:*),Bash(bundle update:*),Bash(bundle exec rake:*),Bash(bundle exec rspec:*),Bash(bundle exec rubocop:*),Edit,MultiEdit,WebFetch,WebSearch,Write'
+    # Ruby 系コマンド (bundle, rake, rails, rspec, rubocop など) と、READ 系コマンドを許可
+    default: 'Agent,Bash(bundle install:*),Bash(bundle update:*),Bash(bundle exec rake:*),Bash(bundle exec rails:*),Bash(bundle exec rspec:*),Bash(bundle exec rubocop:*),Edit,MultiEdit,Glob,Grep,LS,Read,Task,TodoWrite,WebFetch,WebSearch,Write'
+    # 要検討: WRITE 系コマンドは制限する? 例: Write(spec/**)
+    # https://docs.anthropic.com/en/docs/claude-code/settings#tools-available-to-claude
 
   disallowed_tools:
     description: 'Disallow specific tools to exec'
