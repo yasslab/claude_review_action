@@ -203,8 +203,11 @@ runs:
         #   - GitHub のユーザー名に [ ] は使えず、dependabot のアプリスラッグは
         #     GitHub が保有しているため、この名前は詐称できない
         #   - Dependabot は fork ではなく対象リポジトリ内にブランチを作るため、
-        #     PR に含まれるのは write 権限保持者が管理する依存更新のみ
-        #   - 依存更新の bundle install は CI が既に実行しており、新たなリスクはない
+        #     PR に含まれるのは write 権限保持者が管理する lockfile 更新のみ
+        #
+        # ただし「CI も bundle install しているから同じ」ではない。CI のジョブに
+        # CLAUDE_CODE_OAUTH_TOKEN は無いため、こちらで bundle install を走らせると
+        # CI には無かった露出が増える（gem のビルドスクリプトは任意コード実行）。
         if [ "$AUTHOR" != "dependabot[bot]" ]; then
           is_member "$AUTHOR" || deny "対象の Issue/PR の作成者 $AUTHOR がメンバーではありません"
         fi
@@ -220,10 +223,14 @@ runs:
         #                     「さっきの 2 番目の指摘を直して」が通じなくなる
         #
         # ユーザー名として不正な文字列は落とす（$GITHUB_OUTPUT の行が壊れないように）
+        #
+        # ⚠️ jq の正規表現エンジンは Oniguruma (Ruby 系) なので ^ と $ は行単位に
+        #    マッチする。^...$ だと末尾に改行を持つ値 ("abc\n") が通り抜けてしまう。
+        #    文字列全体の境界判定には \A と \z を使うこと。
         COMMENT_AUTHORS="$(printf '%s' "$MEMBERS" | jq -r '
           [ .[].username_github
             | select(type == "string")
-            | select(test("^[A-Za-z0-9-]+$"))
+            | select(test("\\A[A-Za-z0-9-]+\\z"))
           ] | join(",")')"
         echo "members=${COMMENT_AUTHORS},dependabot[bot],claude[bot]" >> "$GITHUB_OUTPUT"
 
