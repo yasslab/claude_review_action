@@ -75,7 +75,14 @@ inputs:
     description: 'Allow specific tools to exec'
     required: false
     # Ruby 系コマンド (bundle, rake, rails, rspec, rubocop など) と、READ 系コマンドを許可
-    default: 'Agent,Bash(bundle install:*),Bash(bundle update:*),Bash(bundle exec rake:*),Bash(bundle exec rails:*),Bash(bundle exec rspec:*),Bash(bundle exec rubocop:*),Edit,MultiEdit,Glob,Grep,LS,Read,Task,TodoWrite,WebFetch,WebSearch,Write'
+    #
+    # ⚠️ bundle 系は Gemfile や spec を評価するため、実質的に任意コード実行になる。
+    #    Action は fork PR のブランチも runner にチェックアウトするので、認証ステップで
+    #    Issue/PR の作成者もメンバーであることを確認している（非メンバーの PR は実行しない）。
+    #    ここに実行系コマンドを足す時は、その前提が崩れていないか必ず確認すること。
+    #
+    # 注: Glob/Grep/LS/Read は Action 側が常に付与するため、ここでの指定は明示のためのもの。
+    default: 'Bash(bundle install:*),Bash(bundle update:*),Bash(bundle exec rake:*),Bash(bundle exec rails:*),Bash(bundle exec rspec:*),Bash(bundle exec rubocop:*),Edit,MultiEdit,Glob,Grep,LS,Read,Task,TodoWrite,WebFetch,WebSearch,Write'
     # 要検討: WRITE 系コマンドは制限する? 例: Write(spec/**)
     # https://docs.anthropic.com/en/docs/claude-code/settings#tools-available-to-claude
 
@@ -140,21 +147,59 @@ runs:
     - name:  Check if available members
       id:    auth
       shell: bash
+      # ${{ }} を run 内に直接展開せず env 経由で渡す（スクリプトインジェクション対策）
+      env:
+        # ACTOR: このイベントを起こした本人。全 webhook payload に存在する。
+        #   イベント別のフォールバックは使わない。たとえば pull_request_review で
+        #   PR 作成者にフォールバックすると、非メンバーがメンバーの PR に
+        #   レビューを付けるだけでメンバーとして通過できてしまう。
+        ACTOR:  ${{ github.event.sender.login }}
+        # AUTHOR: Claude が読み込む内容（PR の差分・Issue 本文）の作成者。
+        #   Action は fork PR のブランチも runner にチェックアウトするため、
+        #   作成者を検証しないと非メンバーのコードが実行され得る。
+        AUTHOR: ${{ github.event.pull_request.user.login || github.event.issue.user.login }}
       run: |
-        # 認証チェック
-        USERNAME="${{ github.event.comment.user.login }}"
-        echo "::debug::Checking authorization for user: $USERNAME"
+        set -euo pipefail
 
-        # members.jsonを取得してメモリ内で処理
-        if curl -s https://yasslab.jp/members.json | \
-           jq -e ".[] | select(.username_github == \"$USERNAME\")" > /dev/null 2>&1; then
-          echo "::notice::✅ Authorized YassLab member: $USERNAME"
-          echo "authorized=true" >> $GITHUB_OUTPUT
-        else
-          echo "::warning::❌ Not authorized: $USERNAME is not a YassLab member"
-          echo "authorized=false" >> $GITHUB_OUTPUT
+        deny() {
+          echo "::warning::実行しません: $1"
+          echo "authorized=false" >> "$GITHUB_OUTPUT"
           exit 0
+        }
+
+        # 空文字は必ず拒否する。members.json 側に空の username_github が
+        # 混入した場合に、空の ACTOR が一致してしまう事故を防ぐ。
+        [ -n "$ACTOR" ]  || deny "イベントを起こしたユーザーを特定できません"
+        [ -n "$AUTHOR" ] || deny "Issue/PR の作成者を特定できません"
+
+        # 取得失敗・タイムアウト・HTTP エラーはすべて拒否側に倒す
+        MEMBERS="$(curl -fsS --proto '=https' --max-time 10 --retry 2 \
+                        https://yasslab.jp/members.json)" \
+          || deny "メンバー一覧を取得できません"
+
+        # jq への文字列補間を避け --arg で渡す。GitHub のログイン名は
+        # 大文字小文字を区別しないため、両辺を小文字化して比較する。
+        is_member() {
+          printf '%s' "$MEMBERS" | jq -e --arg u "$1" '
+            any(.[]; (.username_github // "") as $m
+                     | $m != "" and ($m | ascii_downcase) == ($u | ascii_downcase))
+          ' > /dev/null
+        }
+
+        is_member "$ACTOR" || deny "$ACTOR はメンバーではありません"
+
+        # 作成者チェック。Dependabot だけは静的に許可する。
+        #   - GitHub のユーザー名に [ ] は使えず、dependabot のアプリスラッグは
+        #     GitHub が保有しているため、この名前は詐称できない
+        #   - Dependabot は fork ではなく対象リポジトリ内にブランチを作るため、
+        #     PR に含まれるのは write 権限保持者が管理する依存更新のみ
+        #   - 依存更新の bundle install は CI が既に実行しており、新たなリスクはない
+        if [ "$AUTHOR" != "dependabot[bot]" ]; then
+          is_member "$AUTHOR" || deny "対象の Issue/PR の作成者 $AUTHOR がメンバーではありません"
         fi
+
+        echo "::notice::承認: $ACTOR (対象の作成者: $AUTHOR)"
+        echo "authorized=true" >> "$GITHUB_OUTPUT"
 
     # Docs: https://github.com/anthropics/claude-code-action#readme
     - name: Claude Code Actions
