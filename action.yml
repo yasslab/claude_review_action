@@ -31,7 +31,7 @@ inputs:
       - General principles on YAGNI, UNIX Philosophy, and Premature Optimization.
 
       Consider the project's context and existing patterns when suggesting changes.
-      
+
       All your outputs have to be organized with collapsed sections by using the <details> tags:
       - 🚨 重大な問題 (セキュリティ、破壊的変更)
       - ⚠️ 改善推奨 (ベストプラクティス違反)
@@ -44,10 +44,12 @@ inputs:
       Also note that, for now, you can suggest changes by comments but cannot commit/push to GitHub.
 
   model:
-    description: 'Specify model (default: Claude Sonnet 4)'
+    description: 'Specify model (default: Claude Opus 5)'
     required: false
-    default: 'claude-opus-4-1-20250805'
-    #default: 'claude-opus-4-20250514'
+    # 日付サフィックス付きスナップショット ID は retire 時に 404 になるため、
+    # 日付なしエイリアスを指定する
+    default: 'claude-opus-5'
+    #default: 'claude-opus-4-8'  # 切り戻し先
 
   #trigger_phrase:
   #  description: 'Customize the trigger phrase (default: @claude)'
@@ -86,23 +88,23 @@ inputs:
   #custom_instructions:
   #  description: 'カスタム指示'
   #  required: false
-  #  default: ''          
-          
+  #  default: ''
+
   # Optional: Customize the trigger phrase (default: @claude)
   # trigger_phrase: "/claude"
-          
+
   # Optional: Trigger when specific user is assigned to an issue
   # assignee_trigger: "claude-bot"
-          
+
   # Optional: Allow Claude to run specific commands
   # allowed_tools: "Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*)"
-          
+
   # Optional: Add custom instructions for Claude to customize its behavior for your project
   # custom_instructions: |
   #   Follow our coding standards
   #   Ensure all new code has tests
   #   Use TypeScript for new files
-          
+
   # Optional: Custom environment variables for Claude
   # claude_env: |
   #   NODE_ENV: test
@@ -120,13 +122,13 @@ inputs:
 
   # Optional: Different prompts for different authors
   # direct_prompt: |
-  #   ${{ github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' && 
+  #   ${{ github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' &&
   #   'Welcome! Please review this PR from a first-time contributor. Be encouraging and provide detailed explanations for any suggestions.' ||
   #   'Please provide a thorough code review focusing on our coding standards and best practices.' }}
 
   # Optional: Add specific tools for running tests or linting
   # allowed_tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
-  #        
+  #
   # Optional: Skip review for certain conditions
   # if: |
   #   !contains(github.event.pull_request.title, '[skip-review]') &&
@@ -142,7 +144,7 @@ runs:
         # 認証チェック
         USERNAME="${{ github.event.comment.user.login }}"
         echo "::debug::Checking authorization for user: $USERNAME"
-        
+
         # members.jsonを取得してメモリ内で処理
         if curl -s https://yasslab.jp/members.json | \
            jq -e ".[] | select(.username_github == \"$USERNAME\")" > /dev/null 2>&1; then
