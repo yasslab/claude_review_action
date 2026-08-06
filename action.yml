@@ -18,30 +18,41 @@ inputs:
     description: 'Claude Code API Token'
     required: true
 
-  direct_prompt:
-    description: 'Direct prompt for automated review (no @claude mention needed)'
+  system_prompt:
+    description: 'Appended to the system prompt (style and default behavior)'
     required: false
+    # v1 では prompt を渡すと automation モードになり @claude の指示が無視される。
+    # 渡さずに interactive モードで動かし、常に効かせたい規範だけをここに置く。
+    # これにより「@claude review this」なら定型レビュー、具体的な指示があれば
+    # その指示に従う、という使い分けが分岐なしで成立する。
+    #
+    # ⚠️ 記法の制約: この文字列は claude_args 内でダブルクォートに囲まれて
+    #    shell-quote に渡される。次を使うと壊れる（Validate inputs で検査している）。
+    #      - ダブルクォート
+    #      - 行頭の # （トークナイズ前にコメントとして行ごと削除される）
+    #      - $ とバッククォート（shell-quote が展開を試みる）
     default: |
-      Always respond in Japanese, even if given instructions are in English.
-      Use Japanese for all outputs, explanations, and comments in code.
+      Always respond in Japanese, even if the instructions are written in English.
+      Use Japanese for all outputs, explanations, and code comments.
 
-      Review this pull request and provide constructive feedback on:
+      If the person who mentioned you gave a specific instruction, follow it.
+      If they did not, review the changes and give constructive feedback on:
       - Best practices on Ruby, Jekyll, or Ruby on Rails.
       - Critical bugs, security concerns, and performance considerations.
       - General principles on YAGNI, UNIX Philosophy, and Premature Optimization.
 
-      Consider the project's context and existing patterns when suggesting changes.
+      Consider the project context and existing patterns when suggesting changes.
 
-      All your outputs have to be organized with collapsed sections by using the <details> tags:
+      You can edit files locally to verify your reasoning, but you cannot commit or push.
+      Present any change you propose as a diff in your comment, not as a commit.
+
+      When you write a review, organize it with collapsed sections using <details> tags:
       - 🚨 重大な問題 (セキュリティ、破壊的変更)
       - ⚠️ 改善推奨 (ベストプラクティス違反)
-      - 💡 提案  (より良い実装方法)
+      - 💡 提案 (より良い実装方法)
       - ✅ 良い実装 (参考になる箇所)
 
-      Note: Include only relevant sections. Skip if no items in a category.
-      Reference: https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/organizing-information-with-collapsed-sections
-
-      Also note that, for now, you can suggest changes by comments but cannot commit/push to GitHub.
+      Include only relevant sections. Skip a category when it has no items.
 
   model:
     description: 'Specify model (default: Claude Opus 5)'
@@ -51,99 +62,99 @@ inputs:
     default: 'claude-opus-5'
     #default: 'claude-opus-4-8'  # 切り戻し先
 
-  #trigger_phrase:
-  #  description: 'Customize the trigger phrase (default: @claude)'
-  #  required: false
-  #  default: '@claude'
-
-  #base_branch:
-  #  description: 'ベースブランチ'
-  #  required: false
-  #  default: ''
-
-  #max_turns:
-  #  description: '最大会話ターン数'
-  #  required: false
-  #  default: ''
-
-  #timeout_minutes:
-  #  description: 'タイムアウト（分）'
-  #  required: false
-  #  default: ''
-
   allowed_tools:
     description: 'Allow specific tools to exec'
     required: false
-    # Ruby 系コマンド (bundle, rake, rails, rspec, rubocop など) と、READ 系コマンドを許可
+    # Ruby 系コマンド (bundle, rake, rspec, rubocop など) を許可する。
     #
-    # ⚠️ bundle 系は Gemfile や spec を評価するため、実質的に任意コード実行になる。
+    # ⚠️ bundle 系は Gemfile や Rakefile、spec を評価するため、実質的に任意コード実行になる。
     #    Action は fork PR のブランチも runner にチェックアウトするので、認証ステップで
     #    Issue/PR の作成者もメンバーであることを確認している（非メンバーの PR は実行しない）。
     #    ここに実行系コマンドを足す時は、その前提が崩れていないか必ず確認すること。
     #
-    # 注: Glob/Grep/LS/Read は Action 側が常に付与するため、ここでの指定は明示のためのもの。
-    default: 'Bash(bundle install:*),Bash(bundle update:*),Bash(bundle exec rake:*),Bash(bundle exec rails:*),Bash(bundle exec rspec:*),Bash(bundle exec rubocop:*),Edit,MultiEdit,Glob,Grep,LS,Read,Task,TodoWrite,WebFetch,WebSearch,Write'
-    # 要検討: WRITE 系コマンドは制限する? 例: Write(spec/**)
-    # https://docs.anthropic.com/en/docs/claude-code/settings#tools-available-to-claude
+    # ⚠️ Edit / MultiEdit / Write は書かない。
+    #    Action 側は意図的にこれらを外し、--permission-mode acceptEdits によって
+    #    「workspace 内の編集のみ自動許可、外（~/.bashrc など）は拒否」にしている。
+    #    ここに列挙すると runner 全体への書き込みを解禁してしまう。
+    #    (anthropics/claude-code-action の src/modes/tag/index.ts のコメント参照)
+    #
+    # 注: Glob / Grep / LS / Read は Action 側が常に付与するため、ここには書かない。
+    default: 'Bash(bundle install:*),Bash(bundle update:*),Bash(bundle exec rake:*),Bash(bundle exec rails:*),Bash(bundle exec rspec:*),Bash(bundle exec rubocop:*),Task,TodoWrite,WebFetch,WebSearch'
 
   disallowed_tools:
     description: 'Disallow specific tools to exec'
     required: false
-    # PR 内での自動コミットおよび権限取得コマンドなどを明示的に禁止
-    default: 'Bash(git commit:*),Bash(git push:*),Bash(rm -rf:*),Bash(sudo:*)'
+    # PR 内での自動コミットおよび権限取得コマンドを明示的に禁止する。
+    #
+    # 注: Bash(git push:*) は書いても効かない。Action は push を
+    #     scripts/git-push.sh 経由で許可するため、このパターンにマッチしない。
+    #     コミットを止めることで push まで止める形にしている。
+    #
+    # 注: mcp__github_file_ops__* は use_commit_signing: true にした時だけ
+    #     Action 側が付与する。今は無効だが、有効にした瞬間に Bash パターンの
+    #     deny をすり抜けてコミットできてしまうため、先に塞いでおく。
+    default: 'Bash(git commit:*),Bash(git add:*),Bash(git rm:*),Bash(rm -rf:*),Bash(sudo:*),mcp__github_file_ops__commit_files,mcp__github_file_ops__delete_files'
 
-  #custom_instructions:
-  #  description: 'カスタム指示'
-  #  required: false
-  #  default: ''
-
-  # Optional: Customize the trigger phrase (default: @claude)
-  # trigger_phrase: "/claude"
-
-  # Optional: Trigger when specific user is assigned to an issue
-  # assignee_trigger: "claude-bot"
-
-  # Optional: Allow Claude to run specific commands
-  # allowed_tools: "Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*)"
-
-  # Optional: Add custom instructions for Claude to customize its behavior for your project
-  # custom_instructions: |
-  #   Follow our coding standards
-  #   Ensure all new code has tests
-  #   Use TypeScript for new files
-
-  # Optional: Custom environment variables for Claude
-  # claude_env: |
-  #   NODE_ENV: test
-
-  # Optional: Use sticky comments to make Claude reuse the same comment on subsequent pushes to the same PR
-  # use_sticky_comment: true
-
-  # Optional: Customize review based on file types
-  # direct_prompt: |
-  #   Review this PR focusing on:
-  #   - For TypeScript files: Type safety and proper interface usage
-  #   - For API endpoints: Security, input validation, and error handling
-  #   - For React components: Performance, accessibility, and best practices
-  #   - For tests: Coverage, edge cases, and test quality
-
-  # Optional: Different prompts for different authors
-  # direct_prompt: |
-  #   ${{ github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' &&
-  #   'Welcome! Please review this PR from a first-time contributor. Be encouraging and provide detailed explanations for any suggestions.' ||
-  #   'Please provide a thorough code review focusing on our coding standards and best practices.' }}
-
-  # Optional: Add specific tools for running tests or linting
-  # allowed_tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
+  # v1 で使える主なオプション（必要になったら有効化する）
   #
-  # Optional: Skip review for certain conditions
-  # if: |
-  #   !contains(github.event.pull_request.title, '[skip-review]') &&
-  #   !contains(github.event.pull_request.title, '[WIP]')
+  #   trigger_phrase      メンション語を変える (既定: @claude)
+  #   assignee_trigger    Issue の担当者アサインで起動する
+  #   label_trigger       ラベル付与で起動する
+  #   base_branch         ブランチ作成時の分岐元
+  #   use_sticky_comment  PR へのコメントを 1 つに集約する
+  #   settings            Claude Code の設定を JSON で渡す (環境変数など)
+  #
+  # 以下は v1 で claude_args の CLI フラグに移行した。上の claude_args に足す。
+  #
+  #   max_turns           --max-turns 10
+  #   custom_instructions --append-system-prompt (この Action では system_prompt)
+  #   mcp_config          --mcp-config
+  #
+  # timeout_minutes は廃止。呼び出し元のジョブで timeout-minutes を指定する。
 
 runs:
   using: 'composite'
   steps:
+    # claude_args は shell-quote でトークナイズされるため、壊れる文字が混ざると
+    # ツール指定がサイレントに無効化される。無言で権限が変わるより、明示的に落とす。
+    - name:  Validate inputs
+      shell: bash
+      env:
+        SYSTEM_PROMPT:    ${{ inputs.system_prompt }}
+        ALLOWED_TOOLS:    ${{ inputs.allowed_tools }}
+        DISALLOWED_TOOLS: ${{ inputs.disallowed_tools }}
+        MODEL:            ${{ inputs.model }}
+      run: |
+        set -euo pipefail
+
+        fail() { echo "::error::$1"; exit 1; }
+
+        for name in SYSTEM_PROMPT ALLOWED_TOOLS DISALLOWED_TOOLS MODEL; do
+          value="${!name}"
+          # 空だと nextArg が falsy になり、Action 側が積んだ値ごと null で
+          # 上書きされる (base-action/src/parse-sdk-options.ts)。ツールが
+          # 無言で全て消えるため、空は必ず落とす。
+          [ -n "$value" ] || fail "$name が空です"
+          case "$value" in
+            *'"'*)  fail "$name にダブルクォートは使えません (claude_args の引用が壊れます)" ;;
+            *'\'*)  fail "$name にバックスラッシュは使えません (末尾にあると閉じ引用符が無効化されます)" ;;
+            *'`'*)  fail "$name にバッククォートは使えません" ;;
+            *'$'*)  fail "$name に \$ は使えません (shell-quote が展開を試みます)" ;;
+          esac
+        done
+
+        # 単一行で渡す値に改行が混ざると、後続がフラグとして解釈されうる
+        for name in ALLOWED_TOOLS DISALLOWED_TOOLS MODEL; do
+          case "${!name}" in
+            *$'\n'*) fail "$name に改行は使えません" ;;
+          esac
+        done
+
+        # 行頭 # の行は、トークナイズ前にコメントとして行ごと削除される
+        if printf '%s\n' "$SYSTEM_PROMPT" | grep -qE '^[[:space:]]*#'; then
+          fail "SYSTEM_PROMPT の行頭に # は使えません (その行が無言で削除されます)"
+        fi
+
     - name:  Check if available members
       id:    auth
       shell: bash
@@ -198,22 +209,45 @@ runs:
           is_member "$AUTHOR" || deny "対象の Issue/PR の作成者 $AUTHOR がメンバーではありません"
         fi
 
+        # Claude が読むコメントをメンバーのものだけに絞るため、名前一覧を渡す。
+        # 非メンバーのコメントが混ざると、そこに書かれた文章を指示として
+        # 解釈してしまう余地が残る（プロンプトインジェクション）。
+        #
+        # このリストは allowlist として働き、載っていない投稿者のコメントは
+        # すべて落ちる。そのため次の 2 つを必ず含める。
+        #   dependabot[bot] : 依存更新の説明をコメントに書くため
+        #   claude[bot]     : Claude 自身の過去のレビュー。外すと
+        #                     「さっきの 2 番目の指摘を直して」が通じなくなる
+        #
+        # ユーザー名として不正な文字列は落とす（$GITHUB_OUTPUT の行が壊れないように）
+        COMMENT_AUTHORS="$(printf '%s' "$MEMBERS" | jq -r '
+          [ .[].username_github
+            | select(type == "string")
+            | select(test("^[A-Za-z0-9-]+$"))
+          ] | join(",")')"
+        echo "members=${COMMENT_AUTHORS},dependabot[bot],claude[bot]" >> "$GITHUB_OUTPUT"
+
         echo "::notice::承認: $ACTOR (対象の作成者: $AUTHOR)"
         echo "authorized=true" >> "$GITHUB_OUTPUT"
 
     # Docs: https://github.com/anthropics/claude-code-action#readme
     - name: Claude Code Actions
       if: steps.auth.outputs.authorized == 'true'
-      uses: anthropics/claude-code-action@beta
+      # 可変タグではなく SHA で固定する。タグは後から別のコミットへ付け替えられる
+      # ため、可変タグ参照は侵害されたコードを自動で取り込む経路になる。
+      # 更新は Dependabot (github-actions) で追従する。
+      uses: anthropics/claude-code-action@c038e4dcdedfbbca18dfb17df35a17e40ded4ddc # v1.0.186
       with:
-        allowed_tools:           ${{ inputs.allowed_tools }}
-        disallowed_tools:        ${{ inputs.disallowed_tools }}
-        additional_permissions:  ${{ inputs.additional_permissions }}
         claude_code_oauth_token: ${{ inputs.claude_code_oauth_token }}
-        direct_prompt:           ${{ inputs.direct_prompt }}
-        model:                   ${{ inputs.model }}
-        #trigger_phrase:          ${{ inputs.trigger_phrase }}
-        #base_branch:             ${{ inputs.base_branch }}
-        #max_turns:               ${{ inputs.max_turns }}
-        #timeout_minutes:         ${{ inputs.timeout_minutes }}
-        #custom_instructions:     ${{ inputs.custom_instructions }}
+        additional_permissions:  ${{ inputs.additional_permissions }}
+        # 非メンバーのコメントをコンテキストから除去する
+        include_comments_by_actor: ${{ steps.auth.outputs.members }}
+        # prompt は渡さない。渡すと automation モードになり @claude の指示が
+        # 無視される。渡さないことで interactive モードになり、メンションの
+        # 内容がそのまま指示になる（指示がなければ system_prompt に従って
+        # 定型レビューを行う）。
+        claude_args: |
+          --model "${{ inputs.model }}"
+          --allowedTools "${{ inputs.allowed_tools }}"
+          --disallowedTools "${{ inputs.disallowed_tools }}"
+          --append-system-prompt "${{ inputs.system_prompt }}"
