@@ -240,10 +240,18 @@ runs:
     # Docs: https://github.com/anthropics/claude-code-action#readme
     - name: Claude Code Actions
       if: steps.auth.outputs.authorized == 'true'
-      # 可変タグではなく SHA で固定する。タグは後から別のコミットへ付け替えられる
-      # ため、可変タグ参照は侵害されたコードを自動で取り込む経路になる。
-      # 更新は Dependabot (github-actions) で追従する。
-      uses: anthropics/claude-code-action@c038e4dcdedfbbca18dfb17df35a17e40ded4ddc # v1.0.186
+      # 可変タグを使う。一度 SHA で固定したが、次の理由で戻した。
+      #
+      #   - upstream は週に数回リリースするため、固定すると急速に古くなる。
+      #     既知の脆弱性が公開された版に留まり続ける方が危険
+      #   - SHA + Dependabot の利点は「時間差」であって「レビュー」ではない。
+      #     バンドルされた Action の差分を実際に読む人はいないため、
+      #     PR を挟んでも検知にはつながらない
+      #   - その時間差に週次の PR 対応を払う価値があるか、という判断で見送った
+      #
+      # 判断を見直すのは、upstream のリリース頻度が落ちた時か、
+      # Action の差分を実際にレビューする運用を始める時。
+      uses: anthropics/claude-code-action@v1
       with:
         claude_code_oauth_token: ${{ inputs.claude_code_oauth_token }}
         additional_permissions:  ${{ inputs.additional_permissions }}
