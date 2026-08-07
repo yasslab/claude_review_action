@@ -95,6 +95,35 @@ inputs:
     #     deny をすり抜けてコミットできてしまうため、先に塞いでおく。
     default: 'Bash(git commit:*),Bash(git add:*),Bash(git rm:*),Bash(rm -rf:*),Bash(sudo:*),mcp__github_file_ops__commit_files,mcp__github_file_ops__delete_files'
 
+  member_ids:
+    description: 'GitHub のユーザー名と数値 ID の対応（ユーザー名リサイクル対策）'
+    required: false
+    # GitHub のユーザー名は、改名なら即座に、退会なら 90 日後に解放され、第三者が
+    # 取得できる。members.json は文字列で照合しているため、更新が漏れると解放された
+    # 名前を取得した第三者が通過する。
+    #
+    # 一方、数値 ID は「不変で、別のユーザーを指すために再利用されない」ことが
+    # GitHub 公式に明言されている。そのため同じ login でも ID が違えば別人と判定できる。
+    # https://docs.github.com/en/apps/creating-github-apps/setting-up-a-github-app/best-practices-for-creating-a-github-app
+    #
+    # 注: 人気リポジトリの namespace retirement は OWNER/REPO の組み合わせが対象で、
+    #     ユーザー名自体は再取得できる。この仕組みは防御にならない。
+    #
+    # この表を yasslab.jp ではなくアクション側に置いているのは、**忘れた時に症状が出る**
+    # ようにするため。members.json に ID を足し忘れても何も起きず永久に気づけないが、
+    # ここに無いメンバーは実行が拒否されるので、その場で発覚する。
+    #
+    # メンバーを追加する時: gh api users/<name> --jq .id で ID を調べて 1 行足す。
+    default: |
+      himajin315:1221303
+      nanophate:6015450
+      yasulab:155807
+      hachi8833:4289625
+      rakuda-san-desu:41533420
+      nalabjp:1544172
+      nacchan99:173054484
+      dependabot[bot]:49699333
+
   # v1 で使える主なオプション（必要になったら有効化する）
   #
   #   trigger_phrase      メンション語を変える (既定: @claude)
@@ -169,6 +198,10 @@ runs:
         #   Action は fork PR のブランチも runner にチェックアウトするため、
         #   作成者を検証しないと非メンバーのコードが実行され得る。
         AUTHOR: ${{ github.event.pull_request.user.login || github.event.issue.user.login }}
+        # 数値 ID も payload に入っているため、API を叩かずに照合できる
+        ACTOR_ID:   ${{ github.event.sender.id }}
+        AUTHOR_ID:  ${{ github.event.pull_request.user.id || github.event.issue.user.id }}
+        MEMBER_IDS: ${{ inputs.member_ids }}
       run: |
         set -euo pipefail
 
@@ -180,8 +213,10 @@ runs:
 
         # 空文字は必ず拒否する。members.json 側に空の username_github が
         # 混入した場合に、空の ACTOR が一致してしまう事故を防ぐ。
-        [ -n "$ACTOR" ]  || deny "イベントを起こしたユーザーを特定できません"
-        [ -n "$AUTHOR" ] || deny "Issue/PR の作成者を特定できません"
+        [ -n "$ACTOR" ]     || deny "イベントを起こしたユーザーを特定できません"
+        [ -n "$AUTHOR" ]    || deny "Issue/PR の作成者を特定できません"
+        [ -n "$ACTOR_ID" ]  || deny "イベントを起こしたユーザーの GitHub ID を特定できません"
+        [ -n "$AUTHOR_ID" ] || deny "Issue/PR の作成者の GitHub ID を特定できません"
 
         # 取得失敗・タイムアウト・HTTP エラーはすべて拒否側に倒す
         MEMBERS="$(curl -fsS --proto '=https' --max-time 10 --retry 2 \
@@ -197,7 +232,28 @@ runs:
           ' > /dev/null
         }
 
+        # 対応表から期待する数値 ID を引く（未登録なら空を返す）
+        expected_id() {
+          printf '%s\n' "$MEMBER_IDS" | awk -F: -v u="$1" '
+            {
+              gsub(/^[ \t]+|[ \t]+$/, "", $1)
+              gsub(/^[ \t\r]+|[ \t\r]+$/, "", $2)
+            }
+            $1 == u { print $2; exit }
+          '
+        }
+
+        # ユーザー名リサイクル対策。GitHub の数値 ID は不変で再利用されないため、
+        # 同じ login でも ID が違えば別人。未登録も拒否する（fail-closed）。
+        # 「対応表への追加を忘れる」事故は、ここで拒否されることで即座に発覚する。
+        verify_id() {  # $1=login  $2=payload の ID  $3=ラベル
+          want="$(expected_id "$1")"
+          [ -n "$want" ] || deny "$3 $1 が member_ids に未登録です。gh api users/$1 --jq .id で ID を調べ、action.yml の member_ids に追加してください"
+          [ "$want" = "$2" ] || deny "$3 $1 の GitHub ID が一致しません (対応表 $want / 実際 $2)。ユーザー名が別人に取得された可能性があります"
+        }
+
         is_member "$ACTOR" || deny "$ACTOR はメンバーではありません"
+        verify_id "$ACTOR" "$ACTOR_ID" "イベントを起こした"
 
         # 作成者チェック。Dependabot だけは静的に許可する。
         #   - GitHub のユーザー名に [ ] は使えず、dependabot のアプリスラッグは
@@ -208,9 +264,12 @@ runs:
         # ただし「CI も bundle install しているから同じ」ではない。CI のジョブに
         # CLAUDE_CODE_OAUTH_TOKEN は無いため、こちらで bundle install を走らせると
         # CI には無かった露出が増える（gem のビルドスクリプトは任意コード実行）。
+        # Dependabot は members.json に載っていないので is_member は免除するが、
+        # ID の照合は行う（下の verify_id）。名前だけの許可にしない。
         if [ "$AUTHOR" != "dependabot[bot]" ]; then
           is_member "$AUTHOR" || deny "対象の Issue/PR の作成者 $AUTHOR がメンバーではありません"
         fi
+        verify_id "$AUTHOR" "$AUTHOR_ID" "対象の Issue/PR を作成した"
 
         # Claude が読むコメントをメンバーのものだけに絞るため、名前一覧を渡す。
         # 非メンバーのコメントが混ざると、そこに書かれた文章を指示として

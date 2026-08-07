@@ -71,6 +71,23 @@ jobs:
 2. 対象の Issue / PR の作成者が YassLab メンバー、または Dependabot であること
 
 メンバー判定には [yasslab.jp/members.json](https://yasslab.jp/members.json) を使います。
+加えて、**GitHub の数値 ID が `action.yml` の `member_ids` と一致すること**も確認します。
+
+GitHub のユーザー名は改名なら即座に、退会なら 90 日後に解放され、第三者が取得できます。
+名前だけで判定していると、解放された名前を取得した第三者が通過してしまいます。
+数値 ID は不変で再利用されないため、同じ名前でも ID が違えば別人と判定できます。
+
+### メンバーを追加するとき
+
+`members.json` に加えて、`action.yml` の `member_ids` にも 1 行追加してください。
+
+```bash
+gh api users/<username> --jq .id
+```
+
+**未登録のユーザーは実行できません**（エラーメッセージに追加方法が出ます）。
+`members.json` 側に ID を持たせなかったのは、書き忘れても何も起きず気づけないためです。
+こちらに置けば、忘れた時点で「動かない」という形で必ず発覚します。
 
 2 を課しているのは、この Action が PR のブランチ（fork からの PR を含む）を runner に
 チェックアウトし、レビュー中に `bundle install` などの Ruby コマンドを実行しうるためです。
