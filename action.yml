@@ -95,35 +95,6 @@ inputs:
     #     deny をすり抜けてコミットできてしまうため、先に塞いでおく。
     default: 'Bash(git commit:*),Bash(git add:*),Bash(git rm:*),Bash(rm -rf:*),Bash(sudo:*),mcp__github_file_ops__commit_files,mcp__github_file_ops__delete_files'
 
-  member_ids:
-    description: 'GitHub のユーザー名と数値 ID の対応（ユーザー名リサイクル対策）'
-    required: false
-    # GitHub のユーザー名は、改名なら即座に、退会なら 90 日後に解放され、第三者が
-    # 取得できる。members.json は文字列で照合しているため、更新が漏れると解放された
-    # 名前を取得した第三者が通過する。
-    #
-    # 一方、数値 ID は「不変で、別のユーザーを指すために再利用されない」ことが
-    # GitHub 公式に明言されている。そのため同じ login でも ID が違えば別人と判定できる。
-    # https://docs.github.com/en/apps/creating-github-apps/setting-up-a-github-app/best-practices-for-creating-a-github-app
-    #
-    # 注: 人気リポジトリの namespace retirement は OWNER/REPO の組み合わせが対象で、
-    #     ユーザー名自体は再取得できる。この仕組みは防御にならない。
-    #
-    # この表を yasslab.jp ではなくアクション側に置いているのは、**忘れた時に症状が出る**
-    # ようにするため。members.json に ID を足し忘れても何も起きず永久に気づけないが、
-    # ここに無いメンバーは実行が拒否されるので、その場で発覚する。
-    #
-    # メンバーを追加する時: gh api users/<name> --jq .id で ID を調べて 1 行足す。
-    default: |
-      himajin315:1221303
-      nanophate:6015450
-      yasulab:155807
-      hachi8833:4289625
-      rakuda-san-desu:41533420
-      nalabjp:1544172
-      nacchan99:173054484
-      dependabot[bot]:49699333
-
   # v1 で使える主なオプション（必要になったら有効化する）
   #
   #   trigger_phrase      メンション語を変える (既定: @claude)
@@ -201,7 +172,35 @@ runs:
         # 数値 ID も payload に入っているため、API を叩かずに照合できる
         ACTOR_ID:   ${{ github.event.sender.id }}
         AUTHOR_ID:  ${{ github.event.pull_request.user.id || github.event.issue.user.id }}
-        MEMBER_IDS: ${{ inputs.member_ids }}
+        # メンバー名簿。ここが唯一の認可の根拠。
+        #
+        # ⚠️ inputs にしていないのは、呼び出し元から上書きできないようにするため。
+        #    inputs にすると、呼び出し元ワークフローを 1 つ書き換えるだけで
+        #    名簿ごと差し替えられてしまう。
+        #
+        # GitHub のユーザー名は、改名なら即座に、退会なら 90 日後に解放され、第三者が
+        # 取得できる。名前だけで照合すると、解放された名前を取得した第三者が通過する。
+        # 数値 ID は「不変で、別のユーザーを指すために再利用されない」ことが GitHub 公式に
+        # 明言されているため、同じ login でも ID が違えば別人と判定できる。
+        # https://docs.github.com/en/apps/creating-github-apps/setting-up-a-github-app/best-practices-for-creating-a-github-app
+        #
+        # 注: 人気リポジトリの namespace retirement は OWNER/REPO の組み合わせが対象で、
+        #     ユーザー名自体は再取得できる。この仕組みは防御にならない。
+        #
+        # bot はここに載せない。載せると ACTOR としても通過してしまう
+        # （＝ bot が Claude を起動できてしまう）。
+        #
+        # 追加するとき: gh api users/<name> --jq .id で ID を調べて 1 行足す。
+        #   大文字小文字は GitHub の正式表記に合わせること（照合は完全一致）。
+        # 外すとき: 該当行を削除する。
+        MEMBER_IDS: |
+          himajin315:1221303
+          nanophate:6015450
+          yasulab:155807
+          hachi8833:4289625
+          rakuda-san-desu:41533420
+          nalabjp:1544172
+          nacchan99:173054484
       run: |
         set -euo pipefail
 
@@ -211,28 +210,13 @@ runs:
           exit 0
         }
 
-        # 空文字は必ず拒否する。members.json 側に空の username_github が
-        # 混入した場合に、空の ACTOR が一致してしまう事故を防ぐ。
+        # 空文字は必ず拒否する
         [ -n "$ACTOR" ]     || deny "イベントを起こしたユーザーを特定できません"
         [ -n "$AUTHOR" ]    || deny "Issue/PR の作成者を特定できません"
         [ -n "$ACTOR_ID" ]  || deny "イベントを起こしたユーザーの GitHub ID を特定できません"
         [ -n "$AUTHOR_ID" ] || deny "Issue/PR の作成者の GitHub ID を特定できません"
 
-        # 取得失敗・タイムアウト・HTTP エラーはすべて拒否側に倒す
-        MEMBERS="$(curl -fsS --proto '=https' --max-time 10 --retry 2 \
-                        https://yasslab.jp/members.json)" \
-          || deny "メンバー一覧を取得できません"
-
-        # jq への文字列補間を避け --arg で渡す。GitHub のログイン名は
-        # 大文字小文字を区別しないため、両辺を小文字化して比較する。
-        is_member() {
-          printf '%s' "$MEMBERS" | jq -e --arg u "$1" '
-            any(.[]; (.username_github // "") as $m
-                     | $m != "" and ($m | ascii_downcase) == ($u | ascii_downcase))
-          ' > /dev/null
-        }
-
-        # 対応表から期待する数値 ID を引く（未登録なら空を返す）
+        # 名簿から期待する数値 ID を引く（未登録なら空を返す）
         expected_id() {
           printf '%s\n' "$MEMBER_IDS" | awk -F: -v u="$1" '
             {
@@ -252,24 +236,29 @@ runs:
           [ "$want" = "$2" ] || deny "$3 $1 の GitHub ID が一致しません (対応表 $want / 実際 $2)。ユーザー名が別人に取得された可能性があります"
         }
 
-        is_member "$ACTOR" || deny "$ACTOR はメンバーではありません"
+        # ACTOR は名簿のみ。bot は名簿に載せていないため、ここで自動的に拒否される
+        # （Dependabot が Claude を起動する、という使い方は想定しない）。
         verify_id "$ACTOR" "$ACTOR_ID" "イベントを起こした"
 
-        # 作成者チェック。Dependabot だけは静的に許可する。
+        # AUTHOR は名簿に加えて Dependabot も許可する。
+        # 「メンバーが Dependabot の PR にレビューを依頼する」という運用があるため。
+        # Rails アプリでは依存更新を自動マージしておらず、人が確認している。
+        #
         #   - GitHub のユーザー名に [ ] は使えず、dependabot のアプリスラッグは
         #     GitHub が保有しているため、この名前は詐称できない
         #   - Dependabot は fork ではなく対象リポジトリ内にブランチを作るため、
         #     PR に含まれるのは write 権限保持者が管理する lockfile 更新のみ
+        #   - 名前だけの許可にはせず、ID も照合する
         #
         # ただし「CI も bundle install しているから同じ」ではない。CI のジョブに
         # CLAUDE_CODE_OAUTH_TOKEN は無いため、こちらで bundle install を走らせると
         # CI には無かった露出が増える（gem のビルドスクリプトは任意コード実行）。
-        # Dependabot は members.json に載っていないので is_member は免除するが、
-        # ID の照合は行う（下の verify_id）。名前だけの許可にしない。
-        if [ "$AUTHOR" != "dependabot[bot]" ]; then
-          is_member "$AUTHOR" || deny "対象の Issue/PR の作成者 $AUTHOR がメンバーではありません"
+        if [ "$AUTHOR" = "dependabot[bot]" ]; then
+          [ "$AUTHOR_ID" = "49699333" ] \
+            || deny "dependabot[bot] の GitHub ID が一致しません (期待 49699333 / 実際 $AUTHOR_ID)"
+        else
+          verify_id "$AUTHOR" "$AUTHOR_ID" "対象の Issue/PR を作成した"
         fi
-        verify_id "$AUTHOR" "$AUTHOR_ID" "対象の Issue/PR を作成した"
 
         # Claude が読むコメントをメンバーのものだけに絞るため、名前一覧を渡す。
         # 非メンバーのコメントが混ざると、そこに書かれた文章を指示として
@@ -281,16 +270,13 @@ runs:
         #   claude[bot]     : Claude 自身の過去のレビュー。外すと
         #                     「さっきの 2 番目の指摘を直して」が通じなくなる
         #
-        # ユーザー名として不正な文字列は落とす（$GITHUB_OUTPUT の行が壊れないように）
-        #
-        # ⚠️ jq の正規表現エンジンは Oniguruma (Ruby 系) なので ^ と $ は行単位に
-        #    マッチする。^...$ だと末尾に改行を持つ値 ("abc\n") が通り抜けてしまう。
-        #    文字列全体の境界判定には \A と \z を使うこと。
-        COMMENT_AUTHORS="$(printf '%s' "$MEMBERS" | jq -r '
-          [ .[].username_github
-            | select(type == "string")
-            | select(test("\\A[A-Za-z0-9-]+\\z"))
-          ] | join(",")')"
+        # ユーザー名として不正な文字列は落とす（$GITHUB_OUTPUT の行が壊れないように）。
+        # bot 名は [ ] を含みこの検査を通らないため、下で明示的に追記する。
+        COMMENT_AUTHORS="$(printf '%s\n' "$MEMBER_IDS" | awk -F: '
+          { gsub(/^[ \t]+|[ \t\r]+$/, "", $1) }
+          $1 ~ /^[A-Za-z0-9-]+$/ { printf "%s%s", sep, $1; sep = "," }
+        ')"
+        [ -n "$COMMENT_AUTHORS" ] || deny "メンバー名簿から有効な名前を取り出せません"
         echo "members=${COMMENT_AUTHORS},dependabot[bot],claude[bot]" >> "$GITHUB_OUTPUT"
 
         echo "::notice::承認: $ACTOR (対象の作成者: $AUTHOR)"
